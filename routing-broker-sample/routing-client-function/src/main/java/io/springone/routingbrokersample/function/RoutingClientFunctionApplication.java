@@ -48,8 +48,9 @@ public class RoutingClientFunctionApplication {
 	public Function<String, String> id(Environment env) {
 		String instance = env.getProperty("io.rsocket.routing.client.tags.instance_name", "N/A");
 		return v -> {
-			System.out.println("Adding id: " + v);
-			return v + ":" + instance;
+			String result = v + ":" + instance;
+			System.out.println("Adding id: " + result);
+			return result;
 		};
 	}
 
