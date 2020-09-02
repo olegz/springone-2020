@@ -45,6 +45,7 @@ public class RoutingClientFunctionApplication {
 	}
 
 	@Bean
+	// FOR DEMO PURPOSES ONLY
 	public Function<String, String> id(Environment env) {
 		String instance = env.getProperty("io.rsocket.routing.client.tags.instance_name", "N/A");
 		return v -> {
