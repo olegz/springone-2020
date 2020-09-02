@@ -14,15 +14,17 @@
  * limitations under the License.
  */
 
-package org.springone.function;
+package org.springone.function.rsocket;
 
 import java.util.function.Function;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.function.context.config.RoutingFunction;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.messaging.rsocket.RSocketRequester;
+import org.springframework.util.MimeTypeUtils;
 
 import io.rsocket.Payload;
 import io.rsocket.RSocket;
@@ -40,18 +42,19 @@ public class RsocketFunctionApplication {
 
 	public static void main(String[] args) {
 		ApplicationContext context = SpringApplication.run(RsocketFunctionApplication.class,
-				"--spring.rsocket.server.port=55555");
+				"--spring.rsocket.server.port=55555",
+				"--spring.cloud.function.routing-expression='echo'");
 
 		RSocketRequester rsocketRequester = context.getBean(RSocketRequester.Builder.class).tcp("localhost", 55555);
 
 		useRSocketRequester(rsocketRequester);
-		useRSocket(rsocketRequester.rsocketClient());
-
+//		useRSocket(rsocketRequester.rsocketClient());
 	}
 
 	static void useRSocketRequester(RSocketRequester requester) {
 		requester
-		.route("echo")
+		.route(RoutingFunction.FUNCTION_NAME)
+		.metadata("{\"foo\":\"bob\"}", MimeTypeUtils.APPLICATION_JSON)
 		.data("{\"name\":\"oleg\"}")
 		.retrieveMono(String.class)
 		.subscribe(System.out::println);
