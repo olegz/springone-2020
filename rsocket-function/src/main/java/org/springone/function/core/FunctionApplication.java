@@ -15,23 +15,18 @@
  */
 package org.springone.function.core;
 
-import java.nio.charset.StandardCharsets;
-import java.util.function.Function;
+import java.lang.reflect.Type;
+import java.util.function.Consumer;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cloud.function.context.FunctionCatalog;
-import org.springframework.cloud.function.context.catalog.SimpleFunctionRegistry.FunctionInvocationWrapper;
+import org.springframework.cloud.function.json.JacksonMapper;
+import org.springframework.cloud.function.json.JsonMapper;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.lang.Nullable;
-import org.springframework.messaging.Message;
-import org.springframework.messaging.MessageHeaders;
-import org.springframework.messaging.converter.AbstractMessageConverter;
-import org.springframework.messaging.converter.MessageConverter;
-import org.springframework.util.MimeType;
+import org.springframework.core.ResolvableType;
 
-import reactor.core.publisher.Flux;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  *
@@ -42,82 +37,39 @@ import reactor.core.publisher.Flux;
 public class FunctionApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(FunctionApplication.class, "--spring.cloud.function.definition=uppercase|reverse");
-//		ApplicationContext context = SpringApplication.run(FunctionApplication.class);
-//		FunctionCatalog catalog = context.getBean(FunctionCatalog.class);
-////		FunctionInvocationWrapper
-//		Function<Flux, Flux> function = catalog.lookup("pojoUppercase|reverseReactive");
-//		function.apply(Flux.just("oleg", "bob"))).subscribe(System.out::println);
+		Product p = new Product();
+		p.setName("bike");
+		Event e = new Event<>();
+		e.setKey("purchase");
+		e.setData(p);
+		JacksonMapper mapper = new JacksonMapper(new ObjectMapper());
+
+
+		String jsonString = new String(mapper.toJson(e));
+		System.out.println(jsonString);
+
+		Type type = ResolvableType.forClassWithGenerics(Event.class, String.class, Product.class).getType();
+
+//		Object o = mapper.fromJson(jsonString, type);
+//		System.out.println(o);
+
+
+
+
+		ApplicationContext context = SpringApplication.run(FunctionApplication.class);
 	}
 
 	@Bean
-	public Function<String, String> uppercase() {
-		return v -> {
-			System.out.println("Uppercasing: " + v);
-			return v.toUpperCase();
-		};
-	}
+    public Consumer<Event<String, Product>> receive1() {
+        return data -> {
+//            logger.info("Data received from customer-1..." + data);
+            Product product = data.getData(); // <-- the code is broken here.
+            System.out.println(product);
+//            logger.info(" product id is " + product.getId());
+        };
+    }
 
-//	@Bean
-//	public Function<String, String> echo() {
-//		return v -> {
-//			System.out.println("Echo: " + v);
-//			return v;
-//		};
-//	}
-//
-//	@Bean
-//	public PojoUppercase pojoUppercase() {
-//		return new PojoUppercase();
-//	}
-//
-	@Bean
-	public Function<Person, String> reverse() {
-		return p -> {
-			System.out.println("Reversing: " + p);
-			return new StringBuilder(p.getName()).reverse().toString();
-		};
-	}
-//
-//	@Bean
-//	public Function<Flux<Person>, Flux<String>> reverseReactive() {
-//		return flux -> flux.map(p -> {
-//			System.out.println("Reversing: " + p);
-//			return new StringBuilder(p.getName()).reverse().toString();
-//		});
-//
-//	}
-//
-	@Bean
-	public MessageConverter stringToPersonConverter() {
-		return new AbstractMessageConverter(MimeType.valueOf("application/json")) {
-
-			@Override
-			protected boolean supports(Class<?> clazz) {
-				return Person.class.isAssignableFrom(clazz);
-			}
-
-			@Override
-			@Nullable
-			protected Object convertFromInternal(
-					Message<?> message, Class<?> targetClass, @Nullable Object conversionHint) {
-				String name = (String) message.getPayload();
-				Person person = new Person();
-				person.setName(name);
-				return person;
-			}
-
-			@Override
-			@Nullable
-			protected Object convertToInternal(
-					Object payload, @Nullable MessageHeaders headers, @Nullable Object conversionHint) {
-
-				return ((Person) payload).getName().getBytes(StandardCharsets.UTF_8);
-			}
-		};
-	}
-//
-	private static class Person {
+	public static class Product {
 		private String name;
 
 		public String getName() {
@@ -127,18 +79,28 @@ public class FunctionApplication {
 		public void setName(String name) {
 			this.name = name;
 		}
-
-		@Override
-		public String toString() {
-			return "Person: " + this.name;
-		}
 	}
 
-	public static class PojoUppercase {
+	public static class Event<K, V> {
 
-		public String uppercaseMe(String input) {
-			return input.toUpperCase();
+		private K key;
+
+		public K getKey() {
+			return key;
+		}
+
+		public void setKey(K key) {
+			this.key = key;
+		}
+
+		private V data;
+
+		public V getData() {
+			return data;
+		}
+
+		public void setData(V data) {
+			this.data = data;
 		}
 	}
-
 }

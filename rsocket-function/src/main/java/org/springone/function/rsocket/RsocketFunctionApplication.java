@@ -22,13 +22,19 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.function.context.config.RoutingFunction;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.io.buffer.DefaultDataBuffer;
 import org.springframework.messaging.rsocket.RSocketRequester;
 import org.springframework.util.MimeTypeUtils;
 
 import io.rsocket.Payload;
 import io.rsocket.RSocket;
 import io.rsocket.RSocketClient;
+import io.rsocket.core.RSocketConnector;
+import io.rsocket.metadata.CompositeMetadataCodec;
+import io.rsocket.transport.netty.client.TcpClientTransport;
+import io.rsocket.transport.netty.server.TcpServerTransport;
 import io.rsocket.util.DefaultPayload;
 import reactor.core.publisher.Flux;
 
@@ -41,31 +47,24 @@ import reactor.core.publisher.Flux;
 public class RsocketFunctionApplication {
 
 	public static void main(String[] args) {
-		ApplicationContext context = SpringApplication.run(RsocketFunctionApplication.class,
+		ConfigurableApplicationContext context = SpringApplication.run(RsocketFunctionApplication.class,
 				"--spring.rsocket.server.port=55555",
-				"--spring.cloud.function.routing-expression='echo'");
+				"--spring.cloud.function.routing-expression=headers.func");
 
-		RSocketRequester rsocketRequester = context.getBean(RSocketRequester.Builder.class).tcp("localhost", 55555);
+		RSocketRequester rsocketRequester = context.getBean(RSocketRequester.Builder.class)
+				.tcp("localhost", 55555);
 
-		useRSocketRequester(rsocketRequester);
-//		useRSocket(rsocketRequester.rsocketClient());
+		rsocketRequester
+			.route(RoutingFunction.FUNCTION_NAME)
+			.metadata("{\"func\":\"echo\"}", MimeTypeUtils.APPLICATION_JSON)
+			.data("oleg")
+			.retrieveFlux(String.class)
+			.subscribe(System.out::println);
+
+//		Flux<String> result = rsocketRequester.rsocketClient()
+//				.requestChannel(Flux.just(DefaultPayload.create("\"hello\""), DefaultPayload.create("\"blah\""))).map(Payload::getDataUtf8);
+//		result.subscribe(System.out::println);
 	}
-
-	static void useRSocketRequester(RSocketRequester requester) {
-		requester
-		.route(RoutingFunction.FUNCTION_NAME)
-		.metadata("{\"foo\":\"bob\"}", MimeTypeUtils.APPLICATION_JSON)
-		.data("{\"name\":\"oleg\"}")
-		.retrieveMono(String.class)
-		.subscribe(System.out::println);
-	}
-
-	static void useRSocket(RSocketClient rsocket) {
-		Flux<String> result = rsocket
-				.requestChannel(Flux.just(DefaultPayload.create("\"hello\""), DefaultPayload.create("\"blah\""))).map(Payload::getDataUtf8);
-		result.subscribe(System.out::println);
-	}
-
 
 	@Bean
 	public Function<String, String> uppercase() {
@@ -73,6 +72,14 @@ public class RsocketFunctionApplication {
 			System.out.println("Uppercasing: " + v);
 			return v.toUpperCase();
 		};
+	}
+
+	@Bean
+	public Function<Flux<String>, Flux<String>> uppercaseReactive() {
+		return flux -> flux.map(v -> {
+			System.out.println("Uppercasing reactively: " + v);
+			return v.toUpperCase();
+		});
 	}
 
 
